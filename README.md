@@ -27,5 +27,5 @@ Predecir si lloverá en función de datos climáticos de Australia utilizando **
    streamlit run app/main.py
 
 ##Autores
-- Apellido1 Nombre1
-- Apellido2 Nombre2
+- Calcia Franco
+- Avecilla Tomás
