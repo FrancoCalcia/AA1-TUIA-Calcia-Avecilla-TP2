@@ -1,6 +1,6 @@
 streamlit
-pandas
-scikit-learn
-tensorflow
+pandas==1.5.3
+scikit-learn==1.4.2
+tensorflow==2.18.0
 pickle5
 matplotlib

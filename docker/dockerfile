@@ -1,6 +1,12 @@
 # Usa una imagen base de Python
 FROM python:3.9-slim
 
+# Instala GCC y otras herramientas necesarias para la compilación
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    gcc \
+    g++
+
 # Establece el directorio de trabajo en /app
 WORKDIR /app
 
