@@ -61,12 +61,17 @@ AA1-TUIA-CALC.../
 1. **Construir la imagen Docker**  
    Desde la raíz del proyecto, ejecutar:  
    ```bash
-   docker build -t prediccion-lluvia -f docker/Dockerfile .
+   docker build -t prediccionlluvia .
+   ```
+1. **Muevete a la carpeta docker**  
+   ```bash
+   cd AA1-TUIA-Calcia-Avecilla
+   cd docker
    ```
 
 2. **Ejecutar el contenedor**  
    ```bash
-   docker run -p 8501:8501 prediccion-lluvia
+   docker run -p 8501:8501 prediccionlluvia
    ```
 
 3. **Acceder a la aplicación**  
