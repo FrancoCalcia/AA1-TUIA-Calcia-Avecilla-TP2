@@ -1,7 +1,8 @@
-import streamlit as st
+import streamlit
 import pandas as pd
 import pickle
 import matplotlib.pyplot as plt
+import numpy as np
 
 # Cargar los archivos .pkl
 with open("modelo.pkl", "rb") as f:
@@ -21,6 +22,10 @@ with open("mediana_sunshine.pkl", "rb") as f:
 
 with open("mediana_evaporation.pkl", "rb") as f:
     mediana_evaporation = pickle.load(f)
+    
+with open("knn_imputer.pkl", "rb") as f:
+    knn_imputer = pickle.load(f)
+
 
 # Función para preprocesar los datos de entrada
 def preprocesar(df):
@@ -33,6 +38,33 @@ def preprocesar(df):
 
     df['Location'] = df['Location'].map(mean_encoded_location)
 
+    columnas = ['WindDir9am', 'WindDir3pm', 'WindGustDir']
+
+    # Diccionario de mapeo de direcciones del viento a grados
+    wind_dir_map = {
+        'N': 0,
+        'NNE': 22.5, 'NE': 45, 'ENE': 67.5,
+        'E': 90, 'ESE': 112.5, 'SE': 135, 'SSE': 157.5,
+        'S': 180,
+        'SSW': 202.5, 'SW': 225, 'WSW': 247.5,
+        'W': 270, 'WNW': 292.5, 'NW': 315, 'NNW': 337.5
+    }
+
+    # Aplicar el mapeo de direcciones a grados
+    for col in columnas:
+        df[col] = df[col].map(wind_dir_map)
+
+    # Reemplazar NaN en caso de que haya direcciones no mapeadas
+    df[columnas] = df[columnas].fillna(df[columnas].mean())
+
+    # Representación cíclica de las direcciones del viento
+    for col in columnas:
+        df[col + '_sin'] = np.sin(2 * np.pi * df[col] / 360)
+        df[col + '_cos'] = np.cos(2 * np.pi * df[col] / 360)
+
+    # Dropear las columnas originales si ya no las necesitas
+    df = df.drop(columns=columnas)
+    
     for col, media in medias.items():
         if col in df.columns:  
             df[col] = df[col].fillna(media)
@@ -42,14 +74,16 @@ def preprocesar(df):
     # Agregar columna ficticia RainTomorrow con valor 0
     df['RainTomorrow'] = 0  # Valor ficticio solo para que el scaler no falle
 
-    df['Year'] = df['Date'].dt.year
-    df['Month'] = df['Date'].dt.month
-    df['Day'] = df['Date'].dt.day
-    df['DayOfWeek'] = df['Date'].dt.dayofweek  # Lunes = 0, Domingo = 6
-    df['DayOfYear'] = df['Date'].dt.dayofyear
-
+    
+    df['Month'] = df['Date'].dt.month  # Extraer el mes
+    df['Month_sin'] = np.sin(2 * np.pi * df['Month'] / 12)  # Representación seno
+    df['Month_cos'] = np.cos(2 * np.pi * df['Month'] / 12)  # Representación coseno
+    df.drop(columns=['Date', 'Month'], inplace=True)
+   
+    df[['Cloud9am', 'Cloud3pm']] = knn_imputer.transform(df[['Cloud9am', 'Cloud3pm']])
+    
     # Eliminar columnas innecesarias
-    columnas_a_eliminar = ['WindDir9am', 'WindDir3pm', 'WindGustDir', 'Date', 'Pressure9am', 'Temp3pm', 'Temp9am']
+    columnas_a_eliminar = ['Pressure9am', 'Temp3pm', 'Temp9am']
     df = df.drop(columns=[col for col in columnas_a_eliminar if col in df.columns])
 
     # Escalar los datos
@@ -60,21 +94,21 @@ def preprocesar(df):
     return df_scaled
 
 # Interfaz de usuario en Streamlit
-st.title("Predicción de Lluvia en Australia")
+streamlit.title("Predicción de Lluvia en Australia")
 
 # Subir el archivo CSV con datos
-uploaded_file = st.file_uploader("Elija un archivo CSV", type="csv")
+uploaded_file = streamlit.file_uploader("Elija un archivo CSV", type="csv")
 if uploaded_file is not None:
     df_input = pd.read_csv(uploaded_file)
     df_procesado = preprocesar(df_input)
 
     # Mostrar estadísticas del dataset cargado
-    st.write(f"Datos cargados: {df_procesado.shape[0]} filas y {df_procesado.shape[1]} columnas")
-    st.write("Estadísticas descriptivas de las variables:")
-    st.write(df_procesado.describe())
+    streamlit.write(f"Datos cargados: {df_procesado.shape[0]} filas y {df_procesado.shape[1]} columnas")
+    streamlit.write("Estadísticas descriptivas de las variables:")
+    streamlit.write(df_procesado.describe())
 
     # Slider para ajustar el umbral de probabilidad de lluvia
-    umbral = st.slider("Selecciona el umbral de probabilidad para la lluvia", 0.0, 1.0, 0.67)
+    umbral = streamlit.slider("Selecciona el umbral de probabilidad para la lluvia", 0.0, 1.0, 0.67)
 
     # Hacer predicción
     prediccion = model.predict(df_procesado)
@@ -83,7 +117,7 @@ if uploaded_file is not None:
     resultados = ["Lloverá" if p >= umbral else "No lloverá" for p in prediccion]
     
     # Mostrar la distribución de las probabilidades de lluvia usando un gráfico de dispersión
-    st.write("Distribución de las probabilidades de lluvia")
+    streamlit.write("Distribución de las probabilidades de lluvia")
 
     fig, ax = plt.subplots(figsize=(15, 9))
 
@@ -99,23 +133,23 @@ if uploaded_file is not None:
     ax.legend()
 
     # Mostrar el gráfico
-    st.pyplot(fig)
+    streamlit.pyplot(fig)
 
     # Mostrar resultados
-    st.write("Predicción de lluvia para el día siguiente:")
-    st.write(resultados)
+    streamlit.write("Predicción de lluvia para el día siguiente:")
+    streamlit.write(resultados)
 
     # Información sobre el modelo utilizado
-    st.write("Modelo utilizado para la predicción:")
-    st.write("Este modelo es un modelo de Red Neuronal, entrenado y optimizado con datos historicos.")
+    streamlit.write("Modelo utilizado para la predicción:")
+    streamlit.write("Este modelo es un modelo de Red Neuronal, entrenado y optimizado con datos historicos.")
 
     # Barra lateral con información adicional
-    st.sidebar.markdown("### Acerca de la Aplicación")
-    st.sidebar.markdown("Esta aplicación permite predecir si lloverá o no en Australia "
+    streamlit.sidebar.markdown("### Acerca de la Aplicación")
+    streamlit.sidebar.markdown("Esta aplicación permite predecir si lloverá o no en Australia "
                         "basado en datos históricos de clima. Suba un archivo CSV para obtener los resultados.")
     
     # Botón para descargar los resultados en formato CSV
-    st.download_button(
+    streamlit.download_button(
         label="Descargar predicciones",
         data=df_procesado.to_csv(index=False),
         file_name="predicciones_lluvia.csv",
